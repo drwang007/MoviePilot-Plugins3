@@ -1,0 +1,10 @@
+[
+  {
+    "id": "ANiStrm",
+    "name": "ANiStrm 动画流推送",
+    "version": "1.0",
+    "description": "将新下载的动画媒体信息推送到 ANiStrm 平台",
+    "author": "drwang007",
+    "repo": "https://github.com/drwang007/MoviePilot-Plugins3"
+  }
+]
