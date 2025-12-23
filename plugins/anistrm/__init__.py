@@ -1,15 +1,11 @@
-这是修改后的完整 `__init__.py` 代码。
 
-**主要修改点总结：**
+#**主要修改点总结：**
 
-1. **头部引用**：添加了 `from urllib.parse import quote`。
-2. **`__get_season_list`**：新增方法，动态获取“当前季度”和“上一季度”的时间字符串（如 `2024-10` 和 `2024-7`），以覆盖半年番或跨季补全。
-3. **`get_current_season_list`**：重构了获取逻辑，不再依赖单一的 `self._date` 变量，而是在获取列表时直接生成好带有正确季度路径的下载直链。
-4. **`__task`**：统一了增量和全量更新的逻辑，都通过传递具体的 `link` 给生成函数。
+#1. **头部引用**：添加了 `from urllib.parse import quote`。
+#2. **`__get_season_list`**：新增方法，动态获取“当前季度”和“上一季度”的时间字符串（如 `2024-10` 和 `2024-7`），以覆盖半年番或跨季补全。
+#3. **`get_current_season_list`**：重构了获取逻辑，不再依赖单一的 `self._date` 变量，而是在获取列表时直接生成好带有正确季度路径的下载直链。
+#4. **`__task`**：统一了增量和全量更新的逻辑，都通过传递具体的 `link` 给生成函数。
 
-您可以直接复制以下内容覆盖原文件：
-
-```python
 import os
 import time
 from datetime import datetime, timedelta
