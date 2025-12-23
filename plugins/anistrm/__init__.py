@@ -1,6 +1,19 @@
+这是修改后的完整 `__init__.py` 代码。
+
+**主要修改点总结：**
+
+1. **头部引用**：添加了 `from urllib.parse import quote`。
+2. **`__get_season_list`**：新增方法，动态获取“当前季度”和“上一季度”的时间字符串（如 `2024-10` 和 `2024-7`），以覆盖半年番或跨季补全。
+3. **`get_current_season_list`**：重构了获取逻辑，不再依赖单一的 `self._date` 变量，而是在获取列表时直接生成好带有正确季度路径的下载直链。
+4. **`__task`**：统一了增量和全量更新的逻辑，都通过传递具体的 `link` 给生成函数。
+
+您可以直接复制以下内容覆盖原文件：
+
+```python
 import os
 import time
 from datetime import datetime, timedelta
+from urllib.parse import quote  # 新增引用
 
 import pytz
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -58,7 +71,7 @@ class ANiStrm(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/honue/MoviePilot-Plugins/main/icons/anistrm.png"
     # 插件版本
-    plugin_version = "2.4.2"
+    plugin_version = "2.4.3" # 版本号微调以示区别
     # 插件作者
     plugin_author = "honue"
     # 作者主页
@@ -120,24 +133,75 @@ class ANiStrm(_PluginBase):
                 self._scheduler.print_jobs()
                 self._scheduler.start()
 
-    def __get_ani_season(self, idx_month: int = None) -> str:
+    def __get_season_list(self) -> List[str]:
+        """
+        获取当前季度和上一季度的列表 (格式: YYYY-M)
+        用于覆盖半年番或跨季度的番剧
+        """
         current_date = datetime.now()
-        current_year = current_date.year
-        current_month = idx_month if idx_month else current_date.month
-        for month in range(current_month, 0, -1):
-            if month in [10, 7, 4, 1]:
-                self._date = f'{current_year}-{month}'
-                return f'{current_year}-{month}'
+        year = current_date.year
+        month = current_date.month
+
+        # 季度起始月份
+        q_starts = [1, 4, 7, 10]
+        
+        # 找到小于等于当前月份的最大季度起始月
+        curr_q = max([m for m in q_starts if m <= month])
+        curr_idx = q_starts.index(curr_q)
+        
+        seasons = []
+        
+        # 1. 添加当前季度
+        seasons.append(f"{year}-{curr_q}")
+        
+        # 2. 添加上一季度 (处理跨年情况)
+        if curr_idx == 0:
+            prev_q = 10
+            prev_year = year - 1
+        else:
+            prev_q = q_starts[curr_idx - 1]
+            prev_year = year
+        seasons.append(f"{prev_year}-{prev_q}")
+        
+        return seasons
 
     @retry(Exception, tries=3, logger=logger, ret=[])
-    def get_current_season_list(self) -> List:
-        url = f'https://openani.an-i.workers.dev/{self.__get_ani_season()}/'
+    def get_current_season_list(self) -> List[Dict]:
+        """
+        获取当前季(含上一季)所有番剧列表，直接生成下载链接
+        返回格式统一为 [{'title': '...', 'link': '...'}]
+        """
+        all_files = []
+        
+        # 遍历当前季和上一季
+        for season in self.__get_season_list():
+            url = f'https://openani.an-i.workers.dev/{season}/'
+            try:
+                rep = RequestUtils(ua=settings.USER_AGENT if settings.USER_AGENT else None,
+                                   proxies=settings.PROXY if settings.PROXY else None).post(url=url)
+                
+                # 检查响应状态
+                if rep.status_code != 200:
+                    continue
 
-        rep = RequestUtils(ua=settings.USER_AGENT if settings.USER_AGENT else None,
-                           proxies=settings.PROXY if settings.PROXY else None).post(url=url)
-        logger.debug(rep.text)
-        files_json = rep.json()['files']
-        return [file['name'] for file in files_json]
+                files_json = rep.json().get('files', [])
+                
+                for file in files_json:
+                    file_name = file['name']
+                    # 直接根据所在季度生成完整链接，解决跨季度链接生成错误的问题
+                    encoded_filename = quote(file_name, safe='')
+                    # 构造直链
+                    src_url = f'https://openani.an-i.workers.dev/{season}/{encoded_filename}.mp4?d=true'
+                    
+                    all_files.append({
+                        'title': file_name,
+                        'link': src_url
+                    })
+            except Exception as e:
+                logger.warn(f"解析季度 {season} 数据时出错: {e}")
+                continue
+                
+        return all_files
 
     @retry(Exception, tries=3, logger=logger, ret=[])
     def get_latest_list(self) -> List:
@@ -161,26 +225,34 @@ class ANiStrm(_PluginBase):
             ret_array.append(rss_info)
         return ret_array
 
-    def __touch_strm_file(self, file_name, file_url: str = None) -> bool:
+    def __touch_strm_file(self, file_name, file_url: str) -> bool:
+        """
+        创建 strm 文件
+        """
         if not file_url:
-            # 季度API生成的URL，使用新格式
-            encoded_filename = quote(file_name, safe='')
-            src_url = f'https://openani.an-i.workers.dev/{self._date}/{encoded_filename}.mp4?d=true'
+            return False
+
+        # 检查API获取的URL格式是否符合要求
+        if self._is_url_format_valid(file_url):
+            # 格式符合要求，直接使用
+            src_url = file_url
         else:
-            # 检查API获取的URL格式是否符合要求
-            if self._is_url_format_valid(file_url):
-                # 格式符合要求，直接使用
-                src_url = file_url
-            else:
-                # 格式不符合要求，进行转换
-                src_url = self._convert_url_format(file_url)
+            # 格式不符合要求，进行转换
+            src_url = self._convert_url_format(file_url)
         
+        # 确保目录存在
+        if not os.path.exists(self._storageplace):
+            try:
+                os.makedirs(self._storageplace)
+            except Exception:
+                pass
+
         file_path = f'{self._storageplace}/{file_name}.strm'
         if os.path.exists(file_path):
-            logger.debug(f'{file_name}.strm 文件已存在')
+            # logger.debug(f'{file_name}.strm 文件已存在')
             return False
         try:
-            with open(file_path, 'w') as file:
+            with open(file_path, 'w', encoding='utf-8') as file:
                 file.write(src_url)
                 logger.debug(f'创建 {file_name}.strm 文件成功')
                 return True
@@ -206,20 +278,25 @@ class ANiStrm(_PluginBase):
 
     def __task(self, fulladd: bool = False):
         cnt = 0
-        # 增量添加更新
+        rss_info_list = []
+
+        # 1. 获取文件列表
         if not fulladd:
+            # 增量模式：使用 RSS 获取最新
+            # logger.info("开始执行 ANiStrm 增量更新任务...")
             rss_info_list = self.get_latest_list()
-            logger.info(f'本次处理 {len(rss_info_list)} 个文件')
-            for rss_info in rss_info_list:
-                if self.__touch_strm_file(file_name=rss_info['title'], file_url=rss_info['link']):
-                    cnt += 1
-        # 全量添加当季
         else:
-            name_list = self.get_current_season_list()
-            logger.info(f'本次处理 {len(name_list)} 个文件')
-            for file_name in name_list:
-                if self.__touch_strm_file(file_name=file_name):
-                    cnt += 1
+            # 全量模式：扫描目录 (当前季+上一季)
+            logger.info("开始执行 ANiStrm 全量扫描任务 (含当前季及上一季)...")
+            rss_info_list = self.get_current_season_list()
+
+        logger.info(f'本次处理 {len(rss_info_list)} 个文件信息')
+        
+        # 2. 统一处理文件创建
+        for rss_info in rss_info_list:
+            if self.__touch_strm_file(file_name=rss_info['title'], file_url=rss_info['link']):
+                cnt += 1
+                
         logger.info(f'新创建了 {cnt} 个strm文件')
 
     def get_state(self) -> bool:
@@ -406,3 +483,5 @@ if __name__ == "__main__":
     anistrm = ANiStrm()
     name_list = anistrm.get_latest_list()
     print(name_list)
+
+```
