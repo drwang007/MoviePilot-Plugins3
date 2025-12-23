@@ -480,4 +480,4 @@ if __name__ == "__main__":
     name_list = anistrm.get_latest_list()
     print(name_list)
 
-```
+
