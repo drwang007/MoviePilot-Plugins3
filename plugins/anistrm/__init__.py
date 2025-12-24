@@ -48,6 +48,8 @@ def retry(ExceptionToCheck: Any,
 
         return f_retry
 
+    return deco_retry  # <--- 之前你的代码这里缺失了这一行，导致返回 None
+
 
 class ANiStrm(_PluginBase):
     # 插件名称
@@ -174,7 +176,7 @@ class ANiStrm(_PluginBase):
                 
                 for file in files_json:
                     file_name = file['name']
-                    # 直接根据所在季度生成完整链接，解决跨季度链接生成错误的问题
+                    # 直接根据所在季度生成完整链接
                     encoded_filename = quote(file_name, safe='')
                     # 构造直链
                     src_url = f'https://openani.an-i.workers.dev/{season}/{encoded_filename}.mp4?d=true'
@@ -235,7 +237,6 @@ class ANiStrm(_PluginBase):
 
         file_path = f'{self._storageplace}/{file_name}.strm'
         if os.path.exists(file_path):
-            # logger.debug(f'{file_name}.strm 文件已存在')
             return False
         try:
             with open(file_path, 'w', encoding='utf-8') as file:
@@ -247,19 +248,16 @@ class ANiStrm(_PluginBase):
             return False
 
     def _is_url_format_valid(self, url: str) -> bool:
-        """检查URL格式是否符合要求（.mp4?d=true）"""
+        """检查URL格式是否符合要求"""
         return url.endswith('.mp4?d=true')
 
     def _convert_url_format(self, url: str) -> str:
         """将URL转换为符合要求的格式"""
         if '?d=mp4' in url:
-            # 将 ?d=mp4 替换为 .mp4?d=true
             return url.replace('?d=mp4', '.mp4?d=true')
         elif url.endswith('.mp4'):
-            # 如果已经以.mp4结尾，添加?d=true
             return f'{url}?d=true'
         else:
-            # 其他情况，添加.mp4?d=true
             return f'{url}.mp4?d=true'
 
     def __task(self, fulladd: bool = False):
@@ -269,7 +267,6 @@ class ANiStrm(_PluginBase):
         # 1. 获取文件列表
         if not fulladd:
             # 增量模式：使用 RSS 获取最新
-            # logger.info("开始执行 ANiStrm 增量更新任务...")
             rss_info_list = self.get_latest_list()
         else:
             # 全量模式：扫描目录 (当前季+上一季)
@@ -308,10 +305,7 @@ class ANiStrm(_PluginBase):
                         'content': [
                             {
                                 'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4
-                                },
+                                'props': {'cols': 12, 'md': 4},
                                 'content': [
                                     {
                                         'component': 'VSwitch',
@@ -324,10 +318,7 @@ class ANiStrm(_PluginBase):
                             },
                             {
                                 'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4
-                                },
+                                'props': {'cols': 12, 'md': 4},
                                 'content': [
                                     {
                                         'component': 'VSwitch',
@@ -340,10 +331,7 @@ class ANiStrm(_PluginBase):
                             },
                             {
                                 'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4
-                                },
+                                'props': {'cols': 12, 'md': 4},
                                 'content': [
                                     {
                                         'component': 'VSwitch',
@@ -361,10 +349,7 @@ class ANiStrm(_PluginBase):
                         'content': [
                             {
                                 'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4
-                                },
+                                'props': {'cols': 12, 'md': 4},
                                 'content': [
                                     {
                                         'component': 'VTextField',
@@ -378,10 +363,7 @@ class ANiStrm(_PluginBase):
                             },
                             {
                                 'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4
-                                },
+                                'props': {'cols': 12, 'md': 4},
                                 'content': [
                                     {
                                         'component': 'VTextField',
@@ -400,28 +382,14 @@ class ANiStrm(_PluginBase):
                         'content': [
                             {
                                 'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                },
+                                'props': {'cols': 12},
                                 'content': [
                                     {
                                         'component': 'VAlert',
                                         'props': {
                                             'type': 'info',
                                             'variant': 'tonal',
-                                            'text': '自动从open ANi抓取下载直链生成strm文件，免去人工订阅下载' + '\n' +
-                                                    '配合目录监控使用，strm文件创建在/downloads/strm' + '\n' +
-                                                    '通过目录监控转移到link媒体库文件夹 如/downloads/link/strm  mp会完成刮削',
-                                            'style': 'white-space: pre-line;'
-                                        }
-                                    },
-                                    {
-                                        'component': 'VAlert',
-                                        'props': {
-                                            'type': 'info',
-                                            'variant': 'tonal',
-                                            'text': 'emby容器需要设置代理，docker的环境变量必须要有http_proxy代理变量，大小写敏感，具体见readme.' + '\n' +
-                                                    'https://github.com/honue/MoviePilot-Plugins',
+                                            'text': '自动从open ANi抓取下载直链生成strm文件。\n配合目录监控使用，strm文件创建在/downloads/strm，通过目录监控转移到link媒体库文件夹。',
                                             'style': 'white-space: pre-line;'
                                         }
                                     }
