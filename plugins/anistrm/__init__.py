@@ -1,15 +1,7 @@
-
-#**主要修改点总结：**
-
-#1. **头部引用**：添加了 `from urllib.parse import quote`。
-#2. **`__get_season_list`**：新增方法，动态获取“当前季度”和“上一季度”的时间字符串（如 `2024-10` 和 `2024-7`），以覆盖半年番或跨季补全。
-#3. **`get_current_season_list`**：重构了获取逻辑，不再依赖单一的 `self._date` 变量，而是在获取列表时直接生成好带有正确季度路径的下载直链。
-#4. **`__task`**：统一了增量和全量更新的逻辑，都通过传递具体的 `link` 给生成函数。
-
 import os
 import time
 from datetime import datetime, timedelta
-from urllib.parse import quote  # 新增引用
+from urllib.parse import quote
 
 import pytz
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -56,8 +48,6 @@ def retry(ExceptionToCheck: Any,
 
         return f_retry
 
-    return deco_retry
-
 
 class ANiStrm(_PluginBase):
     # 插件名称
@@ -67,7 +57,7 @@ class ANiStrm(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/honue/MoviePilot-Plugins/main/icons/anistrm.png"
     # 插件版本
-    plugin_version = "2.4.3" # 版本号微调以示区别
+    plugin_version = "2.4.3"
     # 插件作者
     plugin_author = "honue"
     # 作者主页
@@ -307,7 +297,7 @@ class ANiStrm(_PluginBase):
 
     def get_form(self) -> Tuple[List[dict], Dict[str, Any]]:
         """
-        拼装插件配置页面，需要返回两块数据：1、页面配置；2、数据结构
+        拼装插件配置页面
         """
         return [
             {
@@ -479,5 +469,3 @@ if __name__ == "__main__":
     anistrm = ANiStrm()
     name_list = anistrm.get_latest_list()
     print(name_list)
-
-
